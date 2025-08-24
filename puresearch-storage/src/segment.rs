@@ -1,5 +1,5 @@
 use anyhow::Result;
-use memmap2::{Mmap, MmapMut};
+use memmap2::Mmap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write, Seek, SeekFrom};
 use std::path::Path;

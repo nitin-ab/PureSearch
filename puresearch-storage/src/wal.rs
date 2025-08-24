@@ -2,7 +2,7 @@ use anyhow::Result;
 use puresearch_core::ReviewDocument;
 use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
-use std::io::{BufWriter, Write};
+use std::io::{BufWriter, Write, BufReader, Read};
 use std::path::Path;
 use uuid::Uuid;
 
@@ -14,17 +14,20 @@ pub enum WalEntry {
 
 pub struct WriteAheadLog {
     writer: BufWriter<File>,
+    path: std::path::PathBuf,
 }
 
 impl WriteAheadLog {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let path = path.as_ref().to_path_buf();
         let file = OpenOptions::new()
             .create(true)
             .append(true)
-            .open(path)?;
+            .open(&path)?;
         
         Ok(Self {
             writer: BufWriter::new(file),
+            path,
         })
     }
 
@@ -53,5 +56,29 @@ impl WriteAheadLog {
         self.writer.flush()?;
         self.writer.get_ref().sync_all()?;
         Ok(())
+    }
+
+    pub fn read_all_entries(&self) -> Result<Vec<WalEntry>> {
+        let file = File::open(&self.path)?;
+        let mut reader = BufReader::new(file);
+        let mut entries = Vec::new();
+
+        loop {
+            let mut len_bytes = [0u8; 4];
+            match reader.read_exact(&mut len_bytes) {
+                Ok(_) => {},
+                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
+                Err(e) => return Err(e.into()),
+            }
+
+            let len = u32::from_le_bytes(len_bytes) as usize;
+            let mut entry_bytes = vec![0u8; len];
+            reader.read_exact(&mut entry_bytes)?;
+
+            let entry: WalEntry = bincode::deserialize(&entry_bytes)?;
+            entries.push(entry);
+        }
+
+        Ok(entries)
     }
 }
