@@ -1,9 +1,6 @@
 use anyhow::Result;
-use memmap2::{Mmap, MmapMut};
 use puresearch_core::{storage::{StorageEngine, IndexStorage}, ReviewDocument, Index};
 use std::collections::HashMap;
-use std::fs::{File, OpenOptions};
-use std::io::{BufWriter, Write, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
@@ -26,13 +23,34 @@ impl MmapStorage {
         std::fs::create_dir_all(&data_dir)?;
         
         let wal = WriteAheadLog::new(data_dir.join("wal.log"))?;
-        
-        Ok(Self {
+        let mut storage = Self {
             data_dir,
             documents: HashMap::new(),
             indices: HashMap::new(),
             wal,
-        })
+        };
+        
+        storage.recover_from_wal()?;
+        Ok(storage)
+    }
+
+    fn recover_from_wal(&mut self) -> Result<()> {
+        let entries = self.wal.read_all_entries()?;
+        for entry in entries {
+            match entry {
+                wal::WalEntry::Document(doc) => {
+                    self.documents.insert(doc.id, doc);
+                },
+                wal::WalEntry::Delete(id) => {
+                    self.documents.remove(&id);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn flush(&mut self) -> Result<()> {
+        self.wal.sync()
     }
 }
 
