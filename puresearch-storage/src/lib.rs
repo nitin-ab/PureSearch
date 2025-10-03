@@ -43,6 +43,9 @@ impl MmapStorage {
                 },
                 wal::WalEntry::Delete(id) => {
                     self.documents.remove(&id);
+                },
+                wal::WalEntry::Index(index) => {
+                    self.indices.insert(index.id, index);
                 }
             }
         }
@@ -77,6 +80,7 @@ impl StorageEngine for MmapStorage {
 
 impl IndexStorage for MmapStorage {
     fn store_index(&mut self, index: &Index) -> Result<()> {
+        self.wal.write_index_entry(index)?;
         self.indices.insert(index.id, index.clone());
         Ok(())
     }

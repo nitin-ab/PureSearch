@@ -6,10 +6,14 @@ use std::io::{BufWriter, Write, BufReader, Read};
 use std::path::Path;
 use uuid::Uuid;
 
+// Add import for Index
+use puresearch_core::Index;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum WalEntry {
     Document(ReviewDocument),
     Delete(Uuid),
+    Index(Index),
 }
 
 pub struct WriteAheadLog {
@@ -38,6 +42,11 @@ impl WriteAheadLog {
 
     pub fn write_delete_entry(&mut self, id: &Uuid) -> Result<()> {
         let entry = WalEntry::Delete(*id);
+        self.write_entry(&entry)
+    }
+
+    pub fn write_index_entry(&mut self, index: &Index) -> Result<()> {
+        let entry = WalEntry::Index(index.clone());
         self.write_entry(&entry)
     }
 
