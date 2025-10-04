@@ -139,3 +139,24 @@ fn test_index_persistence() {
         assert!(retrieved.documents.contains(&doc_id));
     }
 }
+
+#[test]
+fn test_multiple_indices() {
+    let temp_dir = tempdir().unwrap();
+    let mut storage = MmapStorage::new(temp_dir.path()).unwrap();
+
+    let index1 = Index::new("index1".to_string());
+    let index2 = Index::new("index2".to_string());
+
+    storage.store_index(&index1).unwrap();
+    storage.store_index(&index2).unwrap();
+
+    let indices = storage.list_indices().unwrap();
+    assert_eq!(indices.len(), 2);
+
+    let retrieved1 = storage.get_index(&index1.id).unwrap().unwrap();
+    assert_eq!(retrieved1.name, "index1");
+
+    let retrieved2 = storage.get_index(&index2.id).unwrap().unwrap();
+    assert_eq!(retrieved2.name, "index2");
+}
