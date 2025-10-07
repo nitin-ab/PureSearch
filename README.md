@@ -90,7 +90,7 @@ This project is structured as a Cargo workspace with multiple crates:
 Build and run the API server:
 
 ```
-cargo run --bin puresearch-api
+cargo run -p puresearch-api
 ```
 
 The server will start on `http://localhost:3000` (configurable).

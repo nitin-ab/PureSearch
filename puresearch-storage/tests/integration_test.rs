@@ -5,6 +5,7 @@ use std::collections::HashMap;
 
 // Add imports
 use puresearch_core::{Index, storage::IndexStorage};
+use uuid::Uuid;
 
 #[test]
 fn test_basic_storage_operations() {
@@ -159,4 +160,84 @@ fn test_multiple_indices() {
 
     let retrieved2 = storage.get_index(&index2.id).unwrap().unwrap();
     assert_eq!(retrieved2.name, "index2");
+}
+
+#[test]
+fn test_document_update() {
+    let temp_dir = tempdir().unwrap();
+    let mut storage = MmapStorage::new(temp_dir.path()).unwrap();
+
+    let mut metadata = HashMap::new();
+    metadata.insert("title".to_string(), "Original".to_string());
+
+    let original_doc = ReviewDocument {
+        id: Uuid::new_v4(),
+        content: "Original content".to_string(),
+        metadata: metadata.clone(),
+        timestamp: 0,
+    };
+    storage.store_document(&original_doc).unwrap();
+
+    let mut updated_doc = original_doc.clone();
+    updated_doc.content = "Updated content".to_string();
+    updated_doc.metadata.insert("title".to_string(), "Updated".to_string());
+
+    storage.store_document(&updated_doc).unwrap();
+
+    let retrieved = storage.get_document(&original_doc.id).unwrap().unwrap();
+    assert_eq!(retrieved.content, "Updated content");
+    assert_eq!(retrieved.metadata.get("title").unwrap(), "Updated");
+}
+
+#[test]
+fn test_non_existent_operations() {
+    let temp_dir = tempdir().unwrap();
+    let mut storage = MmapStorage::new(temp_dir.path()).unwrap();
+
+    let fake_id = Uuid::new_v4();
+
+    let doc = storage.get_document(&fake_id).unwrap();
+    assert!(doc.is_none());
+
+    let deleted = storage.delete_document(&fake_id).unwrap();
+    assert!(!deleted);
+
+    let index = storage.get_index(&fake_id).unwrap();
+    assert!(index.is_none());
+}
+
+#[test]
+fn test_empty_document() {
+    let temp_dir = tempdir().unwrap();
+    let mut storage = MmapStorage::new(temp_dir.path()).unwrap();
+
+    let empty_doc = ReviewDocument::new("".to_string(), HashMap::new());
+    let doc_id = empty_doc.id;
+
+    storage.store_document(&empty_doc).unwrap();
+
+    let retrieved = storage.get_document(&doc_id).unwrap().unwrap();
+    assert_eq!(retrieved.content, "");
+    assert!(retrieved.metadata.is_empty());
+}
+
+#[test]
+fn test_index_with_duplicates() {
+    let temp_dir = tempdir().unwrap();
+    let mut storage = MmapStorage::new(temp_dir.path()).unwrap();
+
+    let mut index = Index::new("dup_test".to_string());
+
+    let doc = ReviewDocument::new("Test".to_string(), HashMap::new());
+    let doc_id = doc.id;
+    storage.store_document(&doc).unwrap();
+
+    index.add_document(doc_id);
+    index.add_document(doc_id); // duplicate add
+
+    storage.store_index(&index).unwrap();
+
+    let retrieved = storage.get_index(&index.id).unwrap().unwrap();
+    assert_eq!(retrieved.documents.len(), 1);
+    assert!(retrieved.documents.contains(&doc_id));
 }
